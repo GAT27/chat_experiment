@@ -17,6 +17,8 @@ Use id to select host
 peer:       1st lv output, socket used to connect to others
 ipp[0]:     1st lv output, ip address to connect to
 ipp[1]:     1st lv output, port to connect into
+ipp_ex[0]:  1st lv output, extra stored ip addresses
+ipp_ex[1]:  1st lv output, extra stored ports
 punch:      2nd lv output, special hole punch check plus input (see below)
 hip[|]:     2nd lv output, list of clients on server
 online:     3rd lv output, successful host/client connection
@@ -114,10 +116,10 @@ if bub
                         ds_list_destroy(hip);
                         hip = -1;
                     }
-                    if get_lk==3 and !end_host
+                    if (get_lk==3 and !end_host) or online
                         punch = 0;
-                    show_host = 0;
                     online = 0;
+                    show_host = 0;
                     break;
     }
     
@@ -205,8 +207,11 @@ switch get_id
                                 if punch
                                 {   var line = ds_list_find_value(tip[|ds_list_size(tip)-1],0);
                                     for (var i=ds_list_size(tip)-1;real(string_delete(line,1,string_pos('~',line)))!=lobby;i--)
-                                        if i<0 break;//Check if host is in lobby
-                                        else line = ds_list_find_value(tip[|i],0);
+                                    {   if i<0 break;//Check if host is in lobby
+                                        else
+                                            line = ds_list_find_value(tip[|i],0);
+                                    }
+                                    
                                     if i >= 0
                                     {   check = ds_list_find_value(tip[|i],1);
                                         if punch == 1//Check for no trade (same acquired ip)
@@ -218,10 +223,9 @@ switch get_id
                                                 
                                                 var check3 = string_delete(check,1,string_pos(',',check));
                                                 ipp[0] = string_copy(check,5,string_pos(',',check)-5);
-                                                //ipp[1] = real(string_copy(check,string_pos(',',check)+1,
-                                                  //            string_length(check)-string_pos(',',check)-4));
                                                 ipp[1] = real(string_copy(check3,1,string_pos(',',check3)-1));
                                                 punch++;
+                                                retry_cnt = 0;
                                             }
                                             else
                                             {   show_debug_message("SOMEONE ELSE HAS ALREADY JOINED");
@@ -245,6 +249,7 @@ switch get_id
                                             retry_cnt = -1;
                                         }
                                     }
+                                    
                                     else//Host gone
                                     {   if punch == 1
                                             show_debug_message("HOST IS ALREADY GONE");
@@ -262,7 +267,6 @@ switch get_id
                                     {   check = ds_list_find_value(tip[|i],1);
                                         var check3 = check;
                                         repeat 2 check3 = string_delete(check3,1,string_pos(',',check3));
-                                        //if !real(string_char_at(check,string_pos('}',check)-2))
                                         if string_copy(check3,1,string_pos('}',check3)-2) == '0'
                                         {   var h = ds_list_create();
                                             ds_list_copy(h,tip[|i]);
@@ -354,20 +358,29 @@ switch get_id
                                 }
                                 else
                                 {   if !end_host//Capturing, start hole punching
-                                    {   punch = -1;
-                                        online = 1;
-                                        show_debug_message("CLIENT CAPTURED");
+                                    {   online = 1;
+                                        if keep_host
+                                        {   request = site+"&query=timeout_all_variable&variable=main_lobby";
+                                            get_hs = http_get(request);
+                                            online++;
+                                            show_debug_message("CLIENT CAPTURED AND HOST UP");
+                                        }
+                                        else
+                                        {   punch = -1;
+                                            show_debug_message("CLIENT CAPTURED");
+                                        }
                                     }
                                     else//Ending, stop hosting
                                     {   punch = 0;
                                         show_debug_message("HOST ENDING");
                                     }
-                                    get_lk = 99;//LOCKED AND DONE
+                                    if !keep_host
+                                        get_lk = 99;//LOCKED AND DONE
                                 }
                             }
                             //Failure on hosting or lobby collect/delete, retry
-                            else if real(string_digits(client)) == 0
-                            {   if !punch or end_host
+                            else if real(string_digits(client))==0 and string(client)!="[]"
+                            {   if !punch or keep_host or end_host
                                 {   retry_cnt--;
                                     show_debug_message('I'+string(retry_cnt));
                                 }
@@ -381,38 +394,54 @@ switch get_id
                             }
                             //Collected lobby, find owned and see if there is a trade
                             else
-                            {   var tip = ds_list_create();
+                            {   retry_cnt = 5;
+                                var tip = ds_list_create();
                                 tip = ds_map_find_value(json_decode(client),"default");
                                 for (var i=ds_list_size(tip)-1;real(string_delete(ds_list_find_value(tip[|i],0),1,
                                                                                   string_pos('~',ds_list_find_value(tip[|i],0))))
-                                                                                  !=lobby;i--){};
-                                client = ds_list_find_value(tip[|i],1);
-                                var check3 = client;
-                                repeat 2 check3 = string_delete(check3,1,string_pos(',',check3));
-                                //ipp[2] = string_char_at(client,string_pos('}',client)-2);
-                                ipp[2] = string_copy(check3,1,string_pos('}',check3)-2);
-                                for (i=0;i<ds_list_size(tip);i++)
-                                    ds_list_destroy(tip[|i]);
-                                ds_list_destroy(tip);
+                                                                                  !=lobby;i--)
+                                    if i<0 break;//Check if host is in lobby
                                 
-                                if ipp[2] != '0'//If traded, capture client ip and port and delete host
-                                {   check3 = string_delete(client,1,string_pos(',',client));
-                                    ipp[0] = string_copy(client,5,string_pos(',',client)-5);
-                                    //ipp[1] = real(string_copy(client,string_pos(',',client)+1,
-                                      //            string_length(client)-string_pos(',',client)-4));
-                                    ipp[1] = real(string_copy(check3,1,string_pos(',',check3)-1));
-                                    userother = ipp[2];
-                                    request = site+"&query=timeout_delete_variable&variable=main_lobby"
-                                            + "&value="+username+'~'+string(lobby);
-                                    get_hs = http_get(request);
+                                if i >= 0
+                                {   client = ds_list_find_value(tip[|i],1);
+                                    var check3 = client;
+                                    repeat 2 check3 = string_delete(check3,1,string_pos(',',check3));
+                                    ipp[2] = string_copy(check3,1,string_pos('}',check3)-2);
+                                    for (i=0;i<ds_list_size(tip);i++)
+                                        ds_list_destroy(tip[|i]);
+                                    ds_list_destroy(tip);
+                                    
+                                    if ipp[2] != '0'//If traded, capture client ip and port
+                                    {   check3 = string_delete(client,1,string_pos(',',client));
+                                        userother = ipp[2];
+                                        if keep_host//Keep host up after trade
+                                        {   ipp_ex[0] = string_copy(client,5,string_pos(',',client)-5);
+                                            ipp_ex[1] = real(string_copy(check3,1,string_pos(',',check3)-1));
+                                            ipp[2] = 0;
+                                            request = site+"&query=timeout_set_variable&variable=main_lobby"
+                                                    + "&value="+username+'~'+string(lobby)+"&timeout=120&data="+string(ipp);
+                                        }
+                                        else//Delete host after trade
+                                        {   ipp[0] = string_copy(client,5,string_pos(',',client)-5);
+                                            ipp[1] = real(string_copy(check3,1,string_pos(',',check3)-1));
+                                            request = site+"&query=timeout_delete_variable&variable=main_lobby"
+                                                    + "&value="+username+'~'+string(lobby);
+                                        }
+                                        get_hs = http_get(request);
+                                    }
+                                    else//Otherwise, retry later
+                                        alarm[1] = room_speed * 5;
                                 }
-                                else//Otherwise, retry later
-                                    alarm[1] = room_speed * 2;
+                                
+                                else//Host timed out
+                                {   show_debug_message("HOST EXPIRED");
+                                    retry_cnt = -1;
+                                }
                             }
                         }
                         
                         else//Error, retry
-                        {   if !punch or end_host
+                        {   if !punch or keep_host or end_host
                             {   retry_cnt--;
                                 show_debug_message('O'+string(retry_cnt));
                             }
@@ -427,18 +456,30 @@ switch get_id
 }
 
 //Connection success, go online
-if (get_lk==99) and online
-{   get_lk++;//CONNECT LOCKDOWN
-    return 1;
+if online
+{   if retry_cnt < 0
+        alarm[1] = -1;
+    
+    if get_lk == 99//CONNECT LOCKDOWN
+    {   get_lk++;
+        return 1;
+    }
+    else if online == 2//CONFIRM PLUS CLIENT
+    {   online--;
+        return 1;
+    }
+    else//PENDING OTHERS
+        return 0;
 }
-
 //Connection failure, return to offline
 else if (get_lk>=0) and (retry_cnt<0)
 {   network_destroy(peer);
+    punch = 0;
+    alarm[1] = -1;
     show_debug_message("CONNECTION FAILED");
     get_lk = -1;//ERROR LOCKDOWN
     return -1;
 }
-
 //Connection still pending
-return 0;
+else
+    return 0;

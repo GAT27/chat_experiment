@@ -31,7 +31,7 @@ randomize();
 username = choose("Tester","William","Efrucht","Juls",
                   "Jams","Keeta","Gat","Ozenking",
                   "Fenelus","Composer","Foy","Falco");
-userother = "0";
+users = ds_grid_create(3,1);
 
 online = 0;
 show_host = 0;
@@ -46,7 +46,8 @@ noise = 0;
 buffer_pak = buffer_create(4,buffer_grow,1);
 abuff = buffer_create(4,buffer_grow,1);
 vbuff = buffer_create(4,buffer_grow,1);
-//voice_l = 0;
+c_give = c_orange;
+c_take = c_orange;
 burst = 40;
 for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
 {   var r = ds_map_create();
@@ -60,6 +61,58 @@ for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
 }
 
 </string>
+          </argument>
+        </arguments>
+      </action>
+    </event>
+    <event eventtype="2" enumb="3">
+      <action>
+        <libid>1</libid>
+        <id>611</id>
+        <kind>6</kind>
+        <userelative>-1</userelative>
+        <isquestion>0</isquestion>
+        <useapplyto>-1</useapplyto>
+        <exetype>2</exetype>
+        <functionname></functionname>
+        <codestring></codestring>
+        <whoName>self</whoName>
+        <relative>0</relative>
+        <isnot>0</isnot>
+        <arguments>
+          <argument>
+            <kind>1</kind>
+            <string>c_take</string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string>c_orange</string>
+          </argument>
+        </arguments>
+      </action>
+    </event>
+    <event eventtype="2" enumb="2">
+      <action>
+        <libid>1</libid>
+        <id>611</id>
+        <kind>6</kind>
+        <userelative>-1</userelative>
+        <isquestion>0</isquestion>
+        <useapplyto>-1</useapplyto>
+        <exetype>2</exetype>
+        <functionname></functionname>
+        <codestring></codestring>
+        <whoName>self</whoName>
+        <relative>0</relative>
+        <isnot>0</isnot>
+        <arguments>
+          <argument>
+            <kind>1</kind>
+            <string>c_give</string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string>c_orange</string>
           </argument>
         </arguments>
       </action>
@@ -115,7 +168,9 @@ if mouse_check_button_pressed(mb_left)
     {   if online
         {   end_host = 1;
             QCLOUD(2);
-            punch = 0;
+            ds_grid_resize(users,3,1);
+            audio_free_buffer_sound(noise);
+            buffer_delete(vbuff);
             connect_txt = "CONNECT";
         }
         else if punch
@@ -134,6 +189,7 @@ if mouse_check_button_pressed(mb_left)
         }
         else
         {   QCLOUD(1);
+            keep_host = 1;
             with bubble_connect instance_destroy();
             with bubble_sound instance_destroy();
             connect_txt = "DISCONNECT";
@@ -167,7 +223,17 @@ if rec == burst
 }
 if (rec==2) or (rec==1)
 {   if online
-        network_send_udp(peer,ipp[0],ipp[1],buffer_pak,buffer_get_size(buffer_pak));
+    {   if (host and keep_host) for (var i=0;i&lt;ds_grid_height(users);i++)
+            nettest = network_send_udp(peer,/*"127.0.0.1"*/users[#1,i],users[#2,i],
+                                       buffer_pak,buffer_get_size(buffer_pak));
+        else
+            nettest = network_send_udp(peer,/*"127.0.0.1"*/ipp[0],ipp[1],
+                                       buffer_pak,buffer_get_size(buffer_pak));
+        if nettest &gt;= 0
+        {   c_give = c_red;
+            alarm[2] = room_speed / 3;
+        }
+    }
     else
     {   audio_free_buffer_sound(noise);
         buffer_delete(abuff);
@@ -180,6 +246,7 @@ if (rec==2) or (rec==1)
         //show_debug_message("pitch: " + string(audio_sound_get_pitch(noise)));
         //show_debug_message("gain: " + string(audio_sound_get_gain(noise)));
     }
+    
     if rec == 2
         rec = burst + 1;
     else
@@ -249,12 +316,17 @@ if async_load[?"channel_index"] == channel
 
 if async_load[?"type"] == network_type_data
 {   var buff = async_load[?"buffer"];
-    voice_l = async_load[?"size"]
+    voice_l = async_load[?"size"];
     audio_free_buffer_sound(noise);
     buffer_delete(vbuff);
     vbuff = buffer_create(8,buffer_grow,1);
     buffer_resize(abuff,4);
     buffer_copy(buff,0,voice_l,abuff,0);
+    if voice_l &gt; 1000
+        c_take = c_lime;
+    else
+        c_take = c_navy;
+    alarm[3] = room_speed / 3;
 }
 
 </string>
@@ -283,9 +355,22 @@ if async_load[?"type"] == network_type_data
 
 response = QCLOUD(0);
 if response == 1
-{   instance_create(480,350,bubble_sound);
-    buffer_delete(vbuff);
-    vbuff = buffer_create(4,buffer_grow,1);
+{   var uy = ds_grid_height(users);
+    if !instance_exists(bubble_sound)
+    {   instance_create(480,350,bubble_sound);
+        buffer_delete(vbuff);
+        vbuff = buffer_create(4,buffer_grow,1);
+    }
+    else
+    {   uy++;
+        ds_grid_resize(users,3,uy);
+    }
+    users[#0,uy-1] = userother;
+    
+    if host and keep_host
+    {   users[#1,uy-1] = ipp_ex[0];
+        users[#2,uy-1] = ipp_ex[1];
+    }
 }
 else if response == -1
 {   if instance_exists(bubble_host) with bubble_host instance_destroy();
@@ -347,10 +432,11 @@ if show_host
 draw_set_halign(fa_right);
 draw_text_transformed_color(room_width,0,username,
                             room_width/view_wview[0],room_height/view_hview[0],
-                            0,c_orange,c_orange,c_orange,c_orange,1);
-draw_text_transformed_color(room_width,48,userother,
-                            room_width/view_wview[0],room_height/view_hview[0],
-                            0,c_orange,c_orange,c_orange,c_orange,1);
+                            0,c_give,c_take,c_take,c_give,1);
+for (var i=0;i&lt;ds_grid_height(users);i++)
+    draw_text_transformed_color(room_width,48+48*i,users[#0,i],
+                                room_width/view_wview[0],room_height/view_hview[0],
+                                0,c_orange,c_orange,c_orange,c_orange,1);
 draw_set_halign(fa_left);
 
 </string>
