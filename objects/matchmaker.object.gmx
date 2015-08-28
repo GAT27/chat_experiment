@@ -27,28 +27,37 @@
             <kind>1</kind>
             <string>///LOADER
 
+//Random names
 randomize();
 username = choose("Tester","William","Efrucht","Juls",
                   "Jams","Keeta","Gat","Ozenking",
-                  "Fenelus","Composer","Foy","Falco");
+                  "Fenelus","Composer","Foy","Falco",
+                  "Yellow Swag");
 users = ds_grid_create(3,1);
 
+//Basic setup
 online = 0;
 show_host = 0;
 punch = 0;
 instance_create(480,250,bubble_connect);
 instance_create(480,350,bubble_sound);
+draw_set_font(swis);
 connect_txt = "CONNECT";
 sound_txt = "VOICE OFF";
 
+//Sound setup
 rec = 0;
 noise = 0;
 buffer_pak = buffer_create(4,buffer_grow,1);
 abuff = buffer_create(4,buffer_grow,1);
 vbuff = buffer_create(4,buffer_grow,1);
+pbuff = buffer_create(1000,buffer_fixed,1);
+repair = 0;
 c_give = c_orange;
 c_take = c_orange;
 burst = 40;
+
+//Mic check
 for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
 {   var r = ds_map_create();
     r = audio_get_recorder_info(mic-1);
@@ -164,6 +173,7 @@ QCLOUD(99);
 
 if mouse_check_button_pressed(mb_left)
 {   clicked = instance_position(mouse_x,mouse_y,all);
+    //Connection press
     if instance_exists(bubble_connect) and clicked == bubble_connect.id
     {   if online
         {   end_host = 1;
@@ -195,10 +205,12 @@ if mouse_check_button_pressed(mb_left)
             connect_txt = "DISCONNECT";
         }
     }
+    //Hosting press
     else if instance_exists(bubble_host) and clicked and clicked.object_index==bubble_host
     {   QCLOUD(clicked);
         with bubble_host instance_destroy();
     }
+    //Voice press
     else if instance_exists(bubble_sound) and clicked==bubble_sound.id
     {   if rec
         {   rec = 1;
@@ -222,18 +234,43 @@ if rec == burst
     full_l = 0;
 }
 if (rec==2) or (rec==1)
-{   if online
-    {   if (host and keep_host) for (var i=0;i&lt;ds_grid_height(users);i++)
-            nettest = network_send_udp(peer,/*"127.0.0.1"*/users[#1,i],users[#2,i],
-                                       buffer_pak,buffer_get_size(buffer_pak));
+{   //Send voice
+    if online
+    {   //Host to multiple clients
+        if (host and keep_host) for (var i=0;i&lt;ds_grid_height(users);i++)
+        {   buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_bool,1);
+            network_send_udp(peer,users[#1,i],users[#2,i],pbuff,12);
+            for (var j=0;j&lt;ceil(burst*28.8/room_speed);j++)
+            {   buffer_copy(buffer_pak,j*1000,1000,pbuff,0);
+                nettest = network_send_udp(peer,users[#1,i],users[#2,i],
+                                           pbuff,buffer_get_size(pbuff));
+            }
+            buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_bool,0);
+            network_send_udp(peer,users[#1,i],users[#2,i],pbuff,12);
+        }
+        //Client to host and host to single client
         else
-            nettest = network_send_udp(peer,/*"127.0.0.1"*/ipp[0],ipp[1],
-                                       buffer_pak,buffer_get_size(buffer_pak));
+        {   buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_bool,1);
+            network_send_udp(0*peer,ipp[0],ipp[1],pbuff,12);
+            for (var j=0;j&lt;ceil(burst*28.8/room_speed);j++)
+            {   buffer_copy(buffer_pak,j*1000,1000,pbuff,0);
+                nettest = network_send_udp(0*peer,ipp[0],ipp[1],
+                                           pbuff,buffer_get_size(pbuff));
+            }
+            buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_bool,0);
+            network_send_udp(0*peer,ipp[0],ipp[1],pbuff,12);
+        }
+        
         if nettest &gt;= 0
         {   c_give = c_red;
-            alarm[2] = room_speed / 3;
+            alarm[2] = burst / 3;
         }
     }
+    //Test voice
     else
     {   audio_free_buffer_sound(noise);
         buffer_delete(abuff);
@@ -253,9 +290,11 @@ if (rec==2) or (rec==1)
         rec--;
 }
 
+//Receive voice
 if online and buffer_get_size(vbuff)==8
-{   buffer_copy(abuff,0,voice_l,vbuff,0);
-    noise = audio_create_buffer_sound(vbuff,buffer_s16,16000,0,voice_l,audio_3d);
+{   buffer_copy(abuff,0,buffer_get_size(abuff),vbuff,0);
+    noise = audio_create_buffer_sound(vbuff,buffer_s16,16000,
+                                      0,buffer_get_size(abuff),audio_3d);
     ns = audio_play_sound(noise,2,false);
     audio_sound_pitch(ns,(burst-2) / (burst-3));
 }
@@ -314,19 +353,32 @@ if async_load[?"channel_index"] == channel
             <kind>1</kind>
             <string>///CONNECTION
 
-if async_load[?"type"] == network_type_data
+voice_l = async_load[?"size"];
+if async_load[?"type"]==network_type_data and (voice_l&gt;8)
 {   var buff = async_load[?"buffer"];
-    voice_l = async_load[?"size"];
-    audio_free_buffer_sound(noise);
-    buffer_delete(vbuff);
-    vbuff = buffer_create(8,buffer_grow,1);
-    buffer_resize(abuff,4);
-    buffer_copy(buff,0,voice_l,abuff,0);
-    if voice_l &gt; 1000
-        c_take = c_lime;
-    else
-        c_take = c_navy;
-    alarm[3] = room_speed / 3;
+    //Start or end of broken buffer
+    if voice_l == 12
+    {   if buffer_read(buff,buffer_bool)//Start
+        {   buffer_resize(abuff,4);
+            repair = 1;
+        }
+        else if repair//End
+        {   audio_free_buffer_sound(noise);
+            buffer_delete(vbuff);
+            vbuff = buffer_create(8,buffer_grow,1);
+            c_take = merge_color(c_navy,c_lime,
+                                 clamp((buffer_get_size(abuff)*room_speed)/(28800*burst),0,1));
+            alarm[3] = burst / 3;
+            repair = 0;
+        }
+    }
+    //Buffer rebuild
+    else if repair
+    {   if buffer_get_size(abuff) &gt; 1.1*burst*28800/room_speed
+            repair = 0;
+        else
+            buffer_copy(buff,0,voice_l,abuff,buffer_get_size(abuff));
+    }
 }
 
 </string>
@@ -429,6 +481,7 @@ if show_host
     show_host = 1;
 }
 
+//Namelist
 draw_set_halign(fa_right);
 draw_text_transformed_color(room_width,0,username,
                             room_width/view_wview[0],room_height/view_hview[0],

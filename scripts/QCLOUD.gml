@@ -85,8 +85,10 @@ if bub
                     
         //Either end online communications early or set up host/client connection
         default:    if bub == 2
-                    {   if end_host
-                            network_destroy(peer);
+                    {   if end_host while peer >= 0
+                        {   network_destroy(peer);
+                            peer--;
+                        }
                     }
                     else
                     {   lobby = real(string_delete(bub.ble,1,string_pos('~',bub.ble)));
