@@ -58,7 +58,7 @@ if bub
                     get_cs = -1;
                     get_lh = -1;
                     get_hs = -1;
-                    site = "http://gatq.me/server_work/storage.php?game="+string(game_id);
+                    site = "http://www.gatquest.com/server_work/storage.php?game="+string(game_id);
                     
                     randomize();
                     for (port=6510+irandom(100);peer<0;port++)
