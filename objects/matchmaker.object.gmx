@@ -29,9 +29,9 @@
 
 //Random names
 randomize();
-username = choose("Tester","William","Efrucht","Juls",
-                  "Jams","Keeta","Gat","Ozenking",
-                  "Fenelus","Composer","Foy","Falco",
+username = choose("T ester","W illiam","E frucht","J uls",
+                  "Jams","Kee ta","Gat","Ozen king",
+                  "Fenelus","Comp oser","Foy","Falco",
                   "Yellow Swag");
 users = ds_grid_create(3,1);
 
@@ -129,25 +129,41 @@ for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
     <event eventtype="2" enumb="1">
       <action>
         <libid>1</libid>
-        <id>603</id>
-        <kind>7</kind>
+        <id>601</id>
+        <kind>0</kind>
         <userelative>0</userelative>
         <isquestion>0</isquestion>
         <useapplyto>-1</useapplyto>
-        <exetype>2</exetype>
-        <functionname></functionname>
+        <exetype>1</exetype>
+        <functionname>action_execute_script</functionname>
         <codestring></codestring>
         <whoName>self</whoName>
         <relative>0</relative>
         <isnot>0</isnot>
         <arguments>
           <argument>
-            <kind>1</kind>
-            <string>///RETRY SERVER
-
-QCLOUD(99);
-
-</string>
+            <kind>9</kind>
+            <script>QCLOUD</script>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string>99</string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string></string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string></string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string></string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string></string>
           </argument>
         </arguments>
       </action>
@@ -174,7 +190,7 @@ QCLOUD(99);
 if mouse_check_button_pressed(mb_left)
 {   clicked = instance_position(mouse_x,mouse_y,all);
     //Connection press
-    if instance_exists(bubble_connect) and clicked == bubble_connect.id
+    if instance_exists(bubble_connect) and clicked==bubble_connect.id
     {   if online
         {   end_host = 1;
             QCLOUD(2);
@@ -184,7 +200,7 @@ if mouse_check_button_pressed(mb_left)
             connect_txt = "CONNECT";
         }
         else if punch
-        {   //end_host = 1;
+        {   end_host = 1;
             QCLOUD(2);
             alarm[1] = 1;
             instance_create(480,350,bubble_sound);
@@ -199,7 +215,7 @@ if mouse_check_button_pressed(mb_left)
         }
         else
         {   QCLOUD(1);
-            keep_host = 1;
+            //keep_host = 1;
             with bubble_connect instance_destroy();
             with bubble_sound instance_destroy();
             connect_txt = "DISCONNECT";
@@ -254,16 +270,42 @@ if (rec==2) or (rec==1)
         else
         {   buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_bool,1);
-            network_send_udp(0*peer,ipp[0],ipp[1],pbuff,12);
+            network_send_udp(peer,ipp[0],ipp[1],pbuff,12);
             for (var j=0;j&lt;ceil(burst*28.8/room_speed);j++)
             {   buffer_copy(buffer_pak,j*1000,1000,pbuff,0);
-                nettest = network_send_udp(0*peer,ipp[0],ipp[1],
+                nettest = network_send_udp(peer,ipp[0],ipp[1],
                                            pbuff,buffer_get_size(pbuff));
             }
             buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_bool,0);
-            network_send_udp(0*peer,ipp[0],ipp[1],pbuff,12);
+            network_send_udp(peer,ipp[0],ipp[1],pbuff,12);
         }
+        /*else
+        {   buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_u32,$dec0adde);
+            buffer_write(pbuff,buffer_u8,$0c);
+            buffer_write(pbuff,buffer_u32,$0000000c);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_bool,1);
+            network_send_udp_raw(peer,ipp[0],ipp[1],pbuff,12);
+            buffer_fill(pbuff,5,buffer_u32,$000003e8,4);
+            for (var j=0;j&lt;ceil(burst*28.8/room_speed);j++)
+            {   buffer_copy(buffer_pak,j*1000,1000,pbuff,12);
+                nettest = network_send_udp_raw(peer,ipp[0],ipp[1],
+                                           pbuff,buffer_get_size(pbuff)-12);
+            }
+            buffer_seek(pbuff,buffer_seek_start,0);
+            buffer_write(pbuff,buffer_u32,$dec0adde);
+            buffer_write(pbuff,buffer_u8,$0c);
+            buffer_write(pbuff,buffer_u32,$0000000c);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_u8,$00);
+            buffer_write(pbuff,buffer_bool,0);
+            network_send_udp_raw(peer,ipp[0],ipp[1],pbuff,12);
+        }*/
         
         if nettest &gt;= 0
         {   c_give = c_red;
