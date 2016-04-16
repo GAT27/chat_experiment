@@ -21,6 +21,7 @@
     <object>objects\bubble_host</object>
     <object>objects\bubble_connect</object>
     <object>objects\bubble_sound</object>
+    <object>objects\bubble_interlink</object>
   </objects>
   <rooms name="rooms">
     <room>rooms\room0</room>

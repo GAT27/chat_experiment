@@ -74,6 +74,32 @@ for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
         </arguments>
       </action>
     </event>
+    <event eventtype="2" enumb="4">
+      <action>
+        <libid>1</libid>
+        <id>611</id>
+        <kind>6</kind>
+        <userelative>-1</userelative>
+        <isquestion>0</isquestion>
+        <useapplyto>-1</useapplyto>
+        <exetype>2</exetype>
+        <functionname></functionname>
+        <codestring></codestring>
+        <whoName>self</whoName>
+        <relative>0</relative>
+        <isnot>0</isnot>
+        <arguments>
+          <argument>
+            <kind>1</kind>
+            <string>make_host_end</string>
+          </argument>
+          <argument>
+            <kind>0</kind>
+            <string>1</string>
+          </argument>
+        </arguments>
+      </action>
+    </event>
     <event eventtype="2" enumb="3">
       <action>
         <libid>1</libid>
@@ -194,13 +220,17 @@ if mouse_check_button_pressed(mb_left)
     {   if online
         {   end_host = 1;
             QCLOUD(2);
+            with bubble_interlink instance_destroy();
             ds_grid_resize(users,3,1);
+            ds_grid_clear(users,0);
             audio_free_buffer_sound(noise);
             buffer_delete(vbuff);
             connect_txt = "CONNECT";
         }
         else if punch
-        {   end_host = 1;
+        {   alarm[4] = -1;
+            if make_host_end
+                end_host = 1;
             QCLOUD(2);
             alarm[1] = 1;
             instance_create(480,350,bubble_sound);
@@ -214,8 +244,8 @@ if mouse_check_button_pressed(mb_left)
             connect_txt = "CONNECT";
         }
         else
-        {   QCLOUD(1);
-            //keep_host = 1;
+        {   make_host_end = 0;
+            QCLOUD(1);
             with bubble_connect instance_destroy();
             with bubble_sound instance_destroy();
             connect_txt = "DISCONNECT";
@@ -224,6 +254,7 @@ if mouse_check_button_pressed(mb_left)
     //Hosting press
     else if instance_exists(bubble_host) and clicked and clicked.object_index==bubble_host
     {   QCLOUD(clicked);
+        alarm[4] = room_speed * 5;
         with bubble_host instance_destroy();
     }
     //Voice press
@@ -242,6 +273,13 @@ if mouse_check_button_pressed(mb_left)
         }
         show_debug_message(sound_txt);
     }
+    //Interlink clients
+    else if instance_exists(bubble_interlink) and clicked==bubble_interlink.id
+    {   buffer_seek(pbuff,buffer_seek_start,0);
+        buffer_write(pbuff,buffer_string,ds_grid_write(users));
+        for (var i=0;i&lt;ds_grid_height(users);i++)
+            network_send_udp(peer,users[#1,i],users[#2,i],pbuff,987);
+    }
 }
 
 rec = clamp(rec-1,0,rec);
@@ -252,8 +290,7 @@ if rec == burst
 if (rec==2) or (rec==1)
 {   //Send voice
     if online
-    {   //Host to multiple clients
-        if (host and keep_host) for (var i=0;i&lt;ds_grid_height(users);i++)
+    {   /*if (host and keep_host) */for (var i=0;i&lt;ds_grid_height(users);i++)
         {   buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_bool,1);
             network_send_udp(peer,users[#1,i],users[#2,i],pbuff,12);
@@ -266,7 +303,7 @@ if (rec==2) or (rec==1)
             buffer_write(pbuff,buffer_bool,0);
             network_send_udp(peer,users[#1,i],users[#2,i],pbuff,12);
         }
-        //Client to host and host to single client
+        /*//Host to multiple clients//Client to host and host to single client
         else
         {   buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_bool,1);
@@ -279,7 +316,7 @@ if (rec==2) or (rec==1)
             buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_bool,0);
             network_send_udp(peer,ipp[0],ipp[1],pbuff,12);
-        }
+        }*/
         /*else
         {   buffer_seek(pbuff,buffer_seek_start,0);
             buffer_write(pbuff,buffer_u32,$dec0adde);
@@ -306,7 +343,6 @@ if (rec==2) or (rec==1)
             buffer_write(pbuff,buffer_bool,0);
             network_send_udp_raw(peer,ipp[0],ipp[1],pbuff,12);
         }*/
-        
         if nettest &gt;= 0
         {   c_give = c_red;
             alarm[2] = burst / 3;
@@ -414,6 +450,32 @@ if async_load[?"type"]==network_type_data and (voice_l&gt;8)
             repair = 0;
         }
     }
+    //Update user list
+    else if voice_l == 987
+    {   var u = ds_grid_create(3,9);
+        var g = 1;
+        ds_grid_read(u,buffer_read(buff,buffer_string));
+        for (var i=0;i&lt;ds_grid_height(u);i++)
+        {   if u[#1,i]!=0 and (ip!=u[#1,i] or port!=u[#2,i])
+            for (var j=0;j&lt;ds_grid_height(users);j++)
+            {   if users[#1,j]==u[#1,i] and users[#2,j]==u[#2,i]
+                {   g = 0;
+                    break;
+                }
+            }
+            else
+                continue;
+            if g
+            {   ds_grid_resize(users,3,ds_grid_height(users)+1);
+                users[#0,ds_grid_height(users)-1] = u[#0,i];
+                users[#1,ds_grid_height(users)-1] = u[#1,i];
+                users[#2,ds_grid_height(users)-1] = u[#2,i];
+            }
+            else
+                g = 1;
+        }
+        ds_grid_destroy(u);
+    }
     //Buffer rebuild
     else if repair
     {   if buffer_get_size(abuff) &gt; 1.1*burst*28800/room_speed
@@ -452,6 +514,8 @@ if response == 1
 {   var uy = ds_grid_height(users);
     if !instance_exists(bubble_sound)
     {   instance_create(480,350,bubble_sound);
+        if host
+            instance_create(480,150,bubble_interlink);
         buffer_delete(vbuff);
         vbuff = buffer_create(4,buffer_grow,1);
     }
@@ -460,11 +524,10 @@ if response == 1
         ds_grid_resize(users,3,uy);
     }
     users[#0,uy-1] = userother;
-    
-    if host and keep_host
-    {   users[#1,uy-1] = ipp_ex[0];
+    /*if host and keep_host
+    {*/   users[#1,uy-1] = ipp_ex[0];
         users[#2,uy-1] = ipp_ex[1];
-    }
+    //}
 }
 else if response == -1
 {   if instance_exists(bubble_host) with bubble_host instance_destroy();
@@ -497,15 +560,19 @@ else if response == -1
             <kind>1</kind>
             <string>///DISPLAY
 
-//draw_self();
 if show_host
 {   //Hosting bubble
     if show_host == 2
     {   instance_create(480,250,bubble_connect);
         var bub = instance_create(0,0,bubble_host);
         bub.ble = "0~0";
+        var bub = instance_create(350,0,bubble_host);
+        bub.ble = "0~0.1";
     }
     draw_text_transformed_color(0,0,"HOST",
+                                room_width/view_wview[0],room_height/view_hview[0],
+                                0,c_red,c_red,c_red,c_red,1);
+    draw_text_transformed_color(350,0,"OPEN HOST",
                                 room_width/view_wview[0],room_height/view_hview[0],
                                 0,c_red,c_red,c_red,c_red,1);
     

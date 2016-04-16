@@ -1,6 +1,6 @@
 
 /*
-Based on ShadeSpeed CLOUD INDIE
+Designed to work with ShadeSpeed CLOUD INDIE
 http://gmc.yoyogames.com/index.php?showtopic=623357
 PHP file moved to my "site"
 This is for matchmaking and initial connection, does not provide netcode
@@ -60,13 +60,10 @@ if bub
                     get_hs = -1;
                     site = "http://www.gatquest.com/server_work/storage.php?game="+string(game_id);
                     
-                    var s = random_get_seed();
-                    randomize();//BUG CANT BIND PORT STILL NOT FIXED
-                    for (port=6510+irandom(1000);peer<0;port++)
+                    for (port=6510;peer<0;port++)
                         peer = network_create_socket_ext(network_socket_udp,port);
                     port--;
                     show_debug_message("UDP " + string(port));
-                    random_set_seed(s);
                     request = site+"&query=timeout_set_variable&variable="+string_replace_all(username,' ','+')
                             + "&value=user_ip&timeout=20&data=0";
                     get_ip = http_get(request);
@@ -102,6 +99,10 @@ if bub
                         {   host = 1;
                             get_lk++;
                             get_lh = http_get(request);
+                            if lobby != 0
+                            {   keep_host = 1;
+                                lobby = 0;
+                            }
                         }
                         else//Join as a client
                         {   for (var i=ds_list_size(hip)-1;real(string_delete(ds_list_find_value(hip[|i],0),1,
@@ -124,7 +125,6 @@ if bub
                         punch = 0;
                     online = 0;
                     show_host = 0;
-                    break;
     }
     exit;
 }
@@ -161,7 +161,6 @@ switch get_id
                                 for (var i=0;i<ds_list_size(tip);i++)
                                     ds_list_destroy(tip[|i]);
                                 ds_list_destroy(tip);
-                                
                                 request = site+"&query=timeout_delete_variable&variable="+string_replace_all(username,' ','+')
                                         + "&value=user_ip";
                                 get_cs = http_get(request);
@@ -209,13 +208,12 @@ switch get_id
                                 tip = ds_map_find_value(json_decode(ipp[2]),"default");
                                 
                                 if punch
-                                {   var i=ds_list_size(tip)-1;
+                                {   var i = ds_list_size(tip)-1;
                                     if i >= 0
                                     {   var line = ds_list_find_value(tip[|i],0);
                                         for (var i=ds_list_size(tip)-1;real(string_delete(line,1,string_pos('~',line)))!=lobby;i--)
                                             line = ds_list_find_value(tip[|i],0);//Check if host is in lobby
                                     }
-                                    
                                     if i >= 0
                                     {   var check2 = ds_list_find_value(tip[|i],1);
                                         if punch == 1//Check for no trade (same acquired ip)
@@ -225,10 +223,11 @@ switch get_id
                                                         + "&value="+string_replace_all(userother,' ','+')+'~'+string(lobby)
                                                         + "&timeout=20&data="+string_replace_all(string(ipp),' ','+');
                                                 get_cs = http_get(request);
-                                                
                                                 check2 = string_delete(check2,1,string_pos(',',check2));
-                                                ipp[0] = check;//string_copy(check2,5,string_pos(',',check2)-5);
+                                                ipp[0] = check;
                                                 ipp[1] = real(string_copy(check2,1,string_pos(',',check2)-1));
+                                                ipp_ex[0] = ipp[0];
+                                                ipp_ex[1] = ipp[1];
                                                 punch++;
                                                 retry_cnt = 0;
                                             }
@@ -326,7 +325,6 @@ switch get_id
                                 for (var i=0;i<ds_list_size(tip);i++)
                                     ds_list_destroy(tip[|i]);
                                 ds_list_destroy(tip);
-                                
                                 request = site+"&query=timeout_set_variable&variable=main_lobby"
                                         + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby)
                                         + "&timeout=120&data="+string_replace_all(string(ipp),' ','+');
@@ -406,7 +404,6 @@ switch get_id
                                                                real(string_delete(ds_list_find_value(tip[|i],0),1,
                                                                                   string_pos('~',ds_list_find_value(tip[|i],0))))
                                                                                   !=lobby;i--){};
-                                
                                 if i >= 0
                                 {   client = ds_list_find_value(tip[|i],1);
                                     var check2 = client;
@@ -430,6 +427,8 @@ switch get_id
                                         else//Delete host after trade
                                         {   ipp[0] = string_copy(client,5,string_pos(',',client)-5);
                                             ipp[1] = real(string_copy(check2,1,string_pos(',',check2)-1));
+                                            ipp_ex[0] = ipp[0];
+                                            ipp_ex[1] = ipp[1];
                                             request = site+"&query=timeout_delete_variable&variable=main_lobby"
                                                     + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby);
                                         }
