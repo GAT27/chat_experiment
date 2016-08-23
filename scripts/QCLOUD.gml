@@ -1,4 +1,3 @@
-
 /*
 Designed to work with ShadeSpeed CLOUD INDIE
 http://gmc.yoyogames.com/index.php?showtopic=623357
@@ -29,6 +28,7 @@ username:   input, name of self
 .ble:       input, data to input from hip[|]
 keep_host:  input, if hosting should be kept after a connection
 end_host:   input, end communications during hosting and disable self join, ports are left opened
+sid:        input, server id to use
 */
 
 //Setups
@@ -58,13 +58,13 @@ if bub
                     get_cs = -1;
                     get_lh = -1;
                     get_hs = -1;
-                    site = "http://www.gatquest.com/server_work/storage.php?game="+string(game_id);
+                    site = "http://www.gatquest.com/server_work/storage.php?game=";
                     
                     for (port=6510;peer<0;port++)
                         peer = network_create_socket_ext(network_socket_udp,port);
                     port--;
                     show_debug_message("UDP " + string(port));
-                    request = site+"&query=timeout_set_variable&variable="+string_replace_all(username,' ','+')
+                    request = site+sid+"&query=timeout_set_variable&variable="+string_replace_all(username,' ','+')
                             + "&value=user_ip&timeout=20&data=0";
                     get_ip = http_get(request);
                     break;
@@ -92,7 +92,7 @@ if bub
                     else
                     {   lobby = real(string_delete(bub.ble,1,string_pos('~',bub.ble)));
                         userother = string_copy(bub.ble,1,string_pos('~',bub.ble)-1);
-                        request = site+"&query=timeout_all_variable&variable=main_lobby";
+                        request = site+sid+"&query=timeout_all_variable&variable=main_lobby";
                         get_lk *= -1;
                         
                         if !lobby//Create a host
@@ -141,7 +141,7 @@ switch get_id
                         {   ipp[0] = async_load[?"result"];
                             //Confirm ip on server, go collect it
                             if real(string_digits(ipp[0])) == 1
-                            {   request = site+"&query=timeout_all_variable&variable="+string_replace_all(username,' ','+');
+                            {   request = site+sid+"&query=timeout_all_variable&variable="+string_replace_all(username,' ','+');
                                 get_ip = http_get(request);
                             }
                             //Failure on ip confirm or collect, retry
@@ -161,7 +161,7 @@ switch get_id
                                 for (var i=0;i<ds_list_size(tip);i++)
                                     ds_list_destroy(tip[|i]);
                                 ds_list_destroy(tip);
-                                request = site+"&query=timeout_delete_variable&variable="+string_replace_all(username,' ','+')
+                                request = site+sid+"&query=timeout_delete_variable&variable="+string_replace_all(username,' ','+')
                                         + "&value=user_ip";
                                 get_cs = http_get(request);
                                 show_debug_message("IP OBTAINED (1/2)");
@@ -188,7 +188,7 @@ switch get_id
                         {   ipp[2] = async_load[?"result"];
                             //Confirm either deletion on server (collect lobbies) or ip trade (last check)
                             if real(string_digits(ipp[2])) == 1
-                            {   request = site+"&query=timeout_all_variable&variable=main_lobby";
+                            {   request = site+sid+"&query=timeout_all_variable&variable=main_lobby";
                                 get_cs = http_get(request);
                                 if !punch
                                     show_debug_message("IP OBTAINED (2/2)");
@@ -208,18 +208,16 @@ switch get_id
                                 tip = ds_map_find_value(json_decode(ipp[2]),"default");
                                 
                                 if punch
-                                {   var i = ds_list_size(tip)-1;
-                                    if i >= 0
-                                    {   var line = ds_list_find_value(tip[|i],0);
-                                        for (var i=ds_list_size(tip)-1;real(string_delete(line,1,string_pos('~',line)))!=lobby;i--)
-                                            line = ds_list_find_value(tip[|i],0);//Check if host is in lobby
-                                    }
+                                {   for (var i=ds_list_size(tip)-1;i>=0 and//Check if host is in lobby
+                                                                   real(string_delete(ds_list_find_value(tip[|i],0),1,
+                                                                                      string_pos('~',ds_list_find_value(tip[|i],0))))
+                                                                                      !=lobby;i--){};
                                     if i >= 0
                                     {   var check2 = ds_list_find_value(tip[|i],1);
                                         if punch == 1//Check for no trade (same acquired ip)
                                         {   if check == string_copy(check2,5,string_pos(',',check2)-5)
                                             {   ipp[2] = username;
-                                                request = site+"&query=timeout_set_variable&variable=main_lobby"
+                                                request = site+sid+"&query=timeout_set_variable&variable=main_lobby"
                                                         + "&value="+string_replace_all(userother,' ','+')+'~'+string(lobby)
                                                         + "&timeout=20&data="+string_replace_all(string(ipp),' ','+');
                                                 get_cs = http_get(request);
@@ -325,7 +323,7 @@ switch get_id
                                 for (var i=0;i<ds_list_size(tip);i++)
                                     ds_list_destroy(tip[|i]);
                                 ds_list_destroy(tip);
-                                request = site+"&query=timeout_set_variable&variable=main_lobby"
+                                request = site+sid+"&query=timeout_set_variable&variable=main_lobby"
                                         + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby)
                                         + "&timeout=120&data="+string_replace_all(string(ipp),' ','+');
                                 get_hs = http_get(request);
@@ -354,7 +352,7 @@ switch get_id
                             //Confirm either host on server or client capture or host ending
                             if real(string_digits(client)) == 1
                             {   if !punch//Hosting, go collect lobby
-                                {   request = site+"&query=timeout_all_variable&variable=main_lobby";
+                                {   request = site+sid+"&query=timeout_all_variable&variable=main_lobby";
                                     get_hs = http_get(request);
                                     punch++;
                                     show_debug_message("HOST ONLINE (2/2)");
@@ -363,7 +361,7 @@ switch get_id
                                 {   if !end_host//Capturing, start hole punching
                                     {   online = 1;
                                         if keep_host
-                                        {   request = site+"&query=timeout_all_variable&variable=main_lobby";
+                                        {   request = site+sid+"&query=timeout_all_variable&variable=main_lobby";
                                             get_hs = http_get(request);
                                             online++;
                                             show_debug_message("CLIENT CAPTURED AND HOST UP");
@@ -391,7 +389,7 @@ switch get_id
                             }
                             //End hosting early
                             else if end_host
-                            {   request = site+"&query=timeout_delete_variable&variable=main_lobby"
+                            {   request = site+sid+"&query=timeout_delete_variable&variable=main_lobby"
                                         + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby);
                                 get_hs = http_get(request);
                             }
@@ -416,20 +414,19 @@ switch get_id
                                     if ipp[2] != '0'//If traded, capture client ip and port
                                     {   check2 = string_delete(client,1,string_pos(',',client));
                                         userother = ipp[2];
+                                        ipp_ex[0] = string_copy(client,5,string_pos(',',client)-5);
+                                        ipp_ex[1] = real(string_copy(check2,1,string_pos(',',check2)-1));
+                                        
                                         if keep_host//Keep host up after trade
-                                        {   ipp_ex[0] = string_copy(client,5,string_pos(',',client)-5);
-                                            ipp_ex[1] = real(string_copy(check2,1,string_pos(',',check2)-1));
-                                            ipp[2] = 0;
-                                            request = site+"&query=timeout_set_variable&variable=main_lobby"
+                                        {   ipp[2] = 0;
+                                            request = site+sid+"&query=timeout_set_variable&variable=main_lobby"
                                                     + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby)
                                                     + "&timeout=120&data="+string_replace_all(string(ipp),' ','+');
                                         }
                                         else//Delete host after trade
-                                        {   ipp[0] = string_copy(client,5,string_pos(',',client)-5);
-                                            ipp[1] = real(string_copy(check2,1,string_pos(',',check2)-1));
-                                            ipp_ex[0] = ipp[0];
-                                            ipp_ex[1] = ipp[1];
-                                            request = site+"&query=timeout_delete_variable&variable=main_lobby"
+                                        {   ipp[0] = ipp_ex[0];
+                                            ipp[1] = ipp_ex[1];
+                                            request = site+sid+"&query=timeout_delete_variable&variable=main_lobby"
                                                     + "&value="+string_replace_all(username,' ','+')+'~'+string(lobby);
                                         }
                                         get_hs = http_get(request);

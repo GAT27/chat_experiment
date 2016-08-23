@@ -40,6 +40,7 @@ online = 0;
 show_host = 0;
 punch = 0;
 instance_create(480,250,bubble_connect);
+instance_create(480,550,bubble_connect);
 instance_create(480,350,bubble_sound);
 draw_set_font(swis);
 connect_txt = "CONNECT";
@@ -216,7 +217,8 @@ for (var mic=audio_get_recorder_count();mic&gt;0;mic--)
 if mouse_check_button_pressed(mb_left)
 {   clicked = instance_position(mouse_x,mouse_y,all);
     //Connection press
-    if instance_exists(bubble_connect) and clicked==bubble_connect.id
+    if instance_exists(bubble_connect) and
+    (clicked!=noone) and (clicked.object_index==bubble_connect.object_index)
     {   if online
         {   end_host = 1;
             QCLOUD(2);
@@ -225,6 +227,7 @@ if mouse_check_button_pressed(mb_left)
             ds_grid_clear(users,0);
             audio_free_buffer_sound(noise);
             buffer_delete(vbuff);
+            instance_create(480,550,bubble_connect);
             connect_txt = "CONNECT";
         }
         else if punch
@@ -234,6 +237,7 @@ if mouse_check_button_pressed(mb_left)
             QCLOUD(2);
             alarm[1] = 1;
             instance_create(480,350,bubble_sound);
+            instance_create(480,550,bubble_connect);
             connect_txt = "CONNECT";
         }
         else if show_host
@@ -241,10 +245,15 @@ if mouse_check_button_pressed(mb_left)
             QCLOUD(2);
             with bubble_host instance_destroy();
             instance_create(480,350,bubble_sound);
+            instance_create(480,550,bubble_connect);
             connect_txt = "CONNECT";
         }
         else
         {   make_host_end = 0;
+            if mouse_y &lt; room_height/2
+                sid = string(game_id);
+            else
+                sid = "LPC1768";
             QCLOUD(1);
             with bubble_connect instance_destroy();
             with bubble_sound instance_destroy();
@@ -262,6 +271,7 @@ if mouse_check_button_pressed(mb_left)
     {   if rec
         {   rec = 1;
             instance_create(480,250,bubble_connect);
+            instance_create(480,550,bubble_connect);
             audio_stop_recording(channel);
             sound_txt = "VOICE OFF";
         }
